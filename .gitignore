@@ -1,2 +1,4 @@
 telegramhqdbot/config.py
+telegramhqdbot/database.vdb
+telegramhqdbot/telegrambot.db
 .vscode

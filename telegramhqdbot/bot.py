@@ -1,12 +1,106 @@
 # -*- coding: utf-8 -*-
+from sqlalchemy.orm import query
 import telegramhqdbot.config as config
+from telegramhqdbot.config import States
+import telegramhqdbot.dbworker as dbworker
+import telegramhqdbot.messages as messages
 import telebot
+from telebot import types 
+from telegramhqdbot.dbalchemy import session, User, Tovar
+from telegramhqdbot.messages import DEFAULT_MESSAGE
+
 
 bot = telebot.TeleBot(config.TOKEN)
 
-@bot.message_handler(content_types=["text"])
-def repeat_all_messages(message): # Название функции не играет никакой роли, в принципе
-    bot.send_message(message.chat.id, message.text)
+
+auth_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+auth_keyboard.row(messages.AUTH_KEYBOARD)
+
+default_menu_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+default_menu_keyboard.row(messages.MENU_TOVARI_KEYBOARD, messages.MENU_KUPIT_KEYBOARD)
+default_menu_keyboard.row(messages.MENU_BALANCE_KEYBOARD, messages.MENU_ABOUT_KEYBOARD)
+
+
+
+@bot.message_handler(commands=['start'])
+def cmd_start(message):
+    bot.send_message(message.chat.id, messages.START_MESSAGE, reply_markup=auth_keyboard)
+    dbworker.set_state(message.chat.id, config.States.S_NEED_AUTH.value)
+
+# По команде /reset будем сбрасывать состояния, возвращаясь к началу диалога
+@bot.message_handler(commands=["reset"])
+def cmd_reset(message):
+    bot.send_message(message.chat.id, messages.RETRY_MESSAGE)
+    dbworker.set_state(message.chat.id, config.States.S_NEED_AUTH.value)
+
+# message.from_user.id
+
+
+@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_NEED_AUTH.value)
+def cmd_auth(message):
+    if message.text.lower() == messages.AUTH_KEYBOARD.lower():
+        id = message.from_user.id
+        query = session.query(User).filter_by(telegram_id=id).first()
+        if query is None:
+            user = User(telegram_id=int(message.from_user.id), balance=0)
+            session.add(user)
+            session.commit()
+        bot.send_message(message.chat.id, messages.AUTH_MESSAGE, reply_markup=default_menu_keyboard)
+        dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+        
+
+    
+def cmd_tovari(message):
+    # bot.send_message(message.chat.id, 'Товары: ')
+    tovars = session.query(Tovar).all()
+    text = "Товары:\n"
+    for tovar in tovars:
+        asd = f"{tovar.name}: {tovar.amount}шт. цена: {tovar.cost}р./шт.\n"
+        text += asd
+    bot.send_message(message.chat.id, text)
+    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+
+
+def cmd_kupit(message):
+    bot.send_message(message.chat.id, 'Купить: ')
+    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+
+def cmd_about(message):
+    bot.send_message(message.chat.id, messages.ABOUT_MESSAGE)
+    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+
+def cmd_balance(message):
+    bot.send_message(message.chat.id, 'Баланс: ')
+    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+
+
+
+
+@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_DEFAULT.value)
+def cmd_menu(message):
+    if message.text.lower() == messages.MENU_TOVARI_KEYBOARD.lower():
+        dbworker.set_state(message.chat.id, config.States.S_TOVARI.value)
+        cmd_tovari(message)
+        return
+
+    elif message.text.lower() == messages.MENU_KUPIT_KEYBOARD.lower():
+        dbworker.set_state(message.chat.id, config.States.S_KUPIT.value)
+        cmd_kupit(message)
+        return
+
+    elif message.text.lower() == messages.MENU_BALANCE_KEYBOARD.lower():
+        dbworker.set_state(message.chat.id, config.States.S_BALANCE.value)
+        cmd_balance(message)
+        return
+
+    elif message.text.lower() == messages.MENU_ABOUT_KEYBOARD.lower():
+        dbworker.set_state(message.chat.id, config.States.S_ABOUT.value)
+        cmd_about(message)
+        return
+
+    bot.send_message(message.chat.id, messages.DEFAULT_MESSAGE, reply_markup=default_menu_keyboard)
+
+
 
 if __name__ == '__main__':
      bot.polling(none_stop=True)
