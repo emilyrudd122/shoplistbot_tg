@@ -1,13 +1,22 @@
-import asyncio
+from SimpleQIWI import *
+from time import sleep
+import telegramhqdbot.config as config
 
-from aioqiwi import Wallet
+token = config.qiwi_token         # https://qiwi.com/api
+phone = config.phone_number
 
-async def qiwi():
-    async with Wallet("a77984cb26c3cb2444f6d79c5f628791") as w:
-        w.phone_number = '+79852520741'  # phone number is not required by default, but some methods need it
-        balance = await w.balance()
-        print("ACCOUNTS:")
-        for acc in balance.accounts:
-            print(acc.alias, acc.balance)
+api = QApi(token=token, phone=phone)
+# price = 1
+# comment = api.bill(price)
 
-asyncio.run(qiwi())
+# print("Pay %i rub for %s with comment '%s'" % (price, phone, comment))
+
+
+@api.bind_echo()            # Создаем эхо-функцию.  Она будет вызываться при каждом новом полученном платеже. В качестве аргументов ей
+                            # передаётся информация о платеже. 
+def foo(bar):
+    print("New payment!")
+    print(bar)             
+    api.stop()
+
+api.start()
