@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import query
+from telebot.types import InputMediaPhoto
 import telegramhqdbot.config as config
 from telegramhqdbot.config import States
 import telegramhqdbot.dbworker as dbworker
@@ -22,6 +23,8 @@ default_menu_keyboard.row(messages.MENU_BALANCE_KEYBOARD, messages.MENU_ABOUT_KE
 
 
 
+
+
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
     bot.send_message(message.chat.id, messages.START_MESSAGE, reply_markup=auth_keyboard)
@@ -30,11 +33,15 @@ def cmd_start(message):
 # По команде /reset будем сбрасывать состояния, возвращаясь к началу диалога
 @bot.message_handler(commands=["reset"])
 def cmd_reset(message):
-    bot.send_message(message.chat.id, messages.RETRY_MESSAGE)
+    bot.send_message(message.chat.id, messages.RETRY_MESSAGE, reply_markup=auth_keyboard)
     dbworker.set_state(message.chat.id, config.States.S_NEED_AUTH.value)
 
 # message.from_user.id
 
+@bot.message_handler(func=lambda message: message.text == messages.GET_BACK_MESSAGE)
+def cmd_getback(message):
+    bot.send_message(message.chat.id, messages.DEFAULT_MESSAGE, reply_markup=default_menu_keyboard)
+    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
 
 @bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_NEED_AUTH.value)
 def cmd_auth(message):
@@ -58,22 +65,58 @@ def cmd_tovari(message):
         asd = f"{tovar.name}: {tovar.amount}шт. цена: {tovar.cost}р./шт.\n"
         text += asd
     bot.send_message(message.chat.id, text)
+    # https://ibb.co/GRLF6q7
+    # https://ibb.co/8rqyvMs
+    # https://ibb.co/VqbRr5J
+
+    IMG_URLS = [
+        'AgACAgIAAxkDAAIBdl-PWLDMNhdz4mlac5lOqJEOvQ5MAAJirzEbx_h4SNXZelGYQeQ0m6zrly4AAwEAAwIAA3gAA14JAgABGwQ',
+        'AgACAgIAAxkDAAIBeF-PWLDl67c6iViG_hxhMxDr41X6AAJjrzEbx_h4SFmns-q3adzdqSfNly4AAwEAAwIAA3kAAyrcAQABGwQ',
+        'AgACAgIAAxkDAAIBel-PWLBCzoLjFCfAz-r0LHrppwHUAAJkrzEbx_h4SCyWq44R01HEyWNQmC4AAwEAAwIAA3gAA_b1AQABGwQ'
+    ]
+
+    bot.send_media_group(message.chat.id, [
+        InputMediaPhoto(IMG_URLS[0]),
+        InputMediaPhoto(IMG_URLS[1]),
+        InputMediaPhoto(IMG_URLS[2]),
+        ])
+
     dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
 
 
 def cmd_kupit(message):
     bot.send_message(message.chat.id, 'Купить: ')
-    dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
+
+    kupit_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    query = session.query(Tovar).filter(Tovar.amount>0)
+    for q in query:
+        btn = types.KeyboardButton(q.name)
+        kupit_keyboard.add(btn)
+    kupit_keyboard.add(messages.GET_BACK_MESSAGE)
+    bot.send_message(message.chat.id, "Что вы хотите купить", reply_markup=kupit_keyboard)
+
+    dbworker.set_state(message.chat.id, config.States.S_KUPIT_CHOICE.value)
 
 def cmd_about(message):
     bot.send_message(message.chat.id, messages.ABOUT_MESSAGE)
     dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
 
 def cmd_balance(message):
-    bot.send_message(message.chat.id, 'Баланс: ')
+    balance_message = "Ваш баланс: "
+    # bot.send_message(message.chat.id, 'Баланс: ')
+    user = session.query(User).filter_by(telegram_id=message.from_user.id).first()
+    if user is not None:
+        bot.send_message(message.chat.id, balance_message + str(user.balance))
     dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
 
 
+@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_DEFAULT.value)
+def cmd_kupit_choice(message):
+    query = session.query(Tovar).filter_by(name=message.text).first()
+    if query is not None:
+        text = f"Доступно {query.amount}шт.\nНапишите, сколько вы хотите купить"
+        bot.send_message(message.chat.id, text)
+        # TODO: доделать покупку
 
 
 @bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_DEFAULT.value)
