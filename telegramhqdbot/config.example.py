@@ -1,8 +1,8 @@
 from enum import Enum
 
-TOKEN = 'telegramtoken'
-qiwi_token = 'qiwitoken'
-phone_number = 'phonenumber'
+TOKEN = 'qqq'
+qiwi_token = 'qqq'
+phone_number = '+qqq'
 db_file = 'database.vdb'
 
 
@@ -14,3 +14,5 @@ class States(Enum):
     S_KUPIT = "4"
     S_BALANCE = "5"
     S_ABOUT = "6"
+    S_KUPIT_CHOICE = "7"
+    S_KUPIT_AMOUNT = "8"
