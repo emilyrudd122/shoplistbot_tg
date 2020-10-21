@@ -21,8 +21,7 @@ default_menu_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
 default_menu_keyboard.row(messages.MENU_TOVARI_KEYBOARD, messages.MENU_KUPIT_KEYBOARD)
 default_menu_keyboard.row(messages.MENU_BALANCE_KEYBOARD, messages.MENU_ABOUT_KEYBOARD)
 
-
-
+choices = {}
 
 
 @bot.message_handler(commands=['start'])
@@ -110,13 +109,28 @@ def cmd_balance(message):
     dbworker.set_state(message.chat.id, config.States.S_DEFAULT.value)
 
 
-@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_DEFAULT.value)
+@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_KUPIT_CHOICE.value)
 def cmd_kupit_choice(message):
     query = session.query(Tovar).filter_by(name=message.text).first()
     if query is not None:
         text = f"Доступно {query.amount}шт.\nНапишите, сколько вы хотите купить"
+        choices.update({message.from_user.id:message.text})
         bot.send_message(message.chat.id, text)
-        # TODO: доделать покупку
+        dbworker.set_state(message.chat.id, config.States.S_KUPIT_AMOUNT.value)
+    else:
+        text = "Что - то не так попробуйте еще раз"
+        bot.send_message(message.chat.id, text)
+        cmd_getback(message)
+    
+
+@bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_KUPIT_AMOUNT.value)
+def cmd_kupit_choice(message):
+    # TODO: Доделатб
+    pass
+
+
+    
+    
 
 
 @bot.message_handler(func=lambda message: dbworker.get_current_state(message.chat.id) == config.States.S_DEFAULT.value)
